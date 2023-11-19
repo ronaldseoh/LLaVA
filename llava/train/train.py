@@ -874,11 +874,12 @@ def train():
     if model_args.vision_tower is not None:
         model.get_model().initialize_vision_modules(
             model_args=model_args,
-            fsdp=training_args.fsdp
+            fsdp=training_args.fsdp,
+            cache_dir=training_args.cache_dir,
         )
         
         vision_tower = model.get_vision_tower()
-        vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
+        vision_tower = vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
 
         data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
