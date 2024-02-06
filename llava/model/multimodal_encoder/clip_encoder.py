@@ -21,13 +21,17 @@ class CLIPVisionTower(nn.Module):
         else:
             self.cfg_only = CLIPVisionConfig.from_pretrained(self.vision_tower_name)
 
-    def load_model(self, cache_dir=None):
+    def load_model(self, device_map=None, cache_dir=None):
+        if self.is_loaded:
+            print('{} is already loaded, `load_model` called again, skipping.'.format(self.vision_tower_name))
+            return
+
         if cache_dir is not None:
             self.image_processor = CLIPImageProcessor.from_pretrained(self.vision_tower_name, cache_dir=cache_dir)
-            self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name, cache_dir=cache_dir)
+            self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name, device_map=device_map, cache_dir=cache_dir)
         else:
             self.image_processor = CLIPImageProcessor.from_pretrained(self.vision_tower_name)
-            self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
+            self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name, device_map=device_map)
 
         self.vision_tower.requires_grad_(False)
 
