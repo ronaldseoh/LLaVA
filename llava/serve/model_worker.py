@@ -291,5 +291,5 @@ if __name__ == "__main__":
                          args.load_4bit,
                          args.device,
                          use_flash_attn=args.use_flash_attn,
-                         args.cache_dir)
+                         cached_dir=args.cache_dir)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
