@@ -291,7 +291,7 @@ class ModelWorker:
         for i, tid in enumerate(generation_output['sequences'][0]):
             if tid not in tokenizer.all_special_ids:
                 # i-1 because we are skipping the '<s>' token in the beginning
-                logprobs.append(generation_output['scores'][i-1].cpu().numpy().item())
+                logprobs.append(generation_output['scores'][i-1].cpu().numpy().tolist())
 
         generated_text = ori_prompt
 
