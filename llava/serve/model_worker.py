@@ -171,6 +171,10 @@ class ModelWorker:
         keywords = [stop_str]
         # stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
         streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=15)
+        generation_output_store = {}
+
+        def model_generate_store_output(generate_kwargs, output_store):
+            output_store.update(model.generate(**generate_kwargs))
 
         max_new_tokens = min(max_new_tokens, max_context_length - input_ids.shape[-1] - num_image_tokens)
 
@@ -178,7 +182,7 @@ class ModelWorker:
             yield json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "error_code": 0}).encode() + b"\0"
             return
 
-        thread = Thread(target=model.generate, kwargs=dict(
+        generate_kwargs=dict(
             inputs=input_ids,
             do_sample=do_sample,
             temperature=temperature,
@@ -186,11 +190,15 @@ class ModelWorker:
             max_new_tokens=max_new_tokens,
             streamer=streamer,
             use_cache=True,
-            **image_args
-        ))
+            return_dict_in_generate=True,
+            output_scores=True,
+            **image_args)
+
+        thread = Thread(target=model_generate_store_output, args=(generate_kwargs, generation_output_store,))
         thread.start()
 
         generated_text = ori_prompt
+
         for new_text in streamer:
             generated_text += new_text
             if generated_text.endswith(stop_str):
