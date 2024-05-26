@@ -384,7 +384,7 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
 
         data = json.loads(response.text)
 
-        logging.warning("dtype: " + str(type(data)))
+        logger.warning("dtype: " + str(type(data)))
 
         data = json.loads(data)
 
