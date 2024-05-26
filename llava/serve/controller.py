@@ -227,7 +227,7 @@ class Controller:
 
         try:
             response = requests.post(worker_addr + "/worker_generate_nostream",
-                json=params, stream=False, timeout=5)
+                json=params, stream=False, timeout=200)
 
             return response.content.encode() + b"\0"
         except requests.exceptions.RequestException as e:

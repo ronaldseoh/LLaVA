@@ -381,9 +381,9 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
     try:
         # Stream output
         response = requests.post(worker_addr + "/worker_generate_nostream",
-            headers=headers, json=pload, stream=False, timeout=10)
+            headers=headers, json=pload, stream=False, timeout=200)
                 
-        data = json.loads(response.content.decode())
+        data = json.loads(response.content)
 
         if data["error_code"] == 0:
             output = data["text"][len(prompt):].strip()
