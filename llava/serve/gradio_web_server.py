@@ -382,7 +382,7 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
         response = requests.post(worker_addr + "/worker_generate_nostream",
             headers=headers, json=pload, stream=False, timeout=200)
 
-        logger.warning(response.text)
+        logger.warning("nostream response", response.content)
 
         for chunk in response.iter_lines(decode_unicode=False, delimiter=b"\0"):
             if chunk:
