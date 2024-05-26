@@ -13,7 +13,7 @@ from typing import List, Union
 import threading
 
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, ORJSONResponse
+from fastapi.responses import StreamingResponse
 import numpy as np
 import requests
 import uvicorn
@@ -223,7 +223,7 @@ class Controller:
                 "text": server_error_msg,
                 "error_code": 2,
             }
-            return ret
+            return json.dumps(ret).encode()
 
         try:
             response = requests.post(worker_addr + "/worker_generate_nostream",
@@ -236,7 +236,7 @@ class Controller:
                 "text": server_error_msg,
                 "error_code": 3,
             }
-            return ret
+            return json.dumps(ret).encode()
 
     # Let the controller act as a worker to achieve hierarchical
     # management. This can be used to connect isolated sub networks.
@@ -303,11 +303,11 @@ async def worker_api_generate_stream(request: Request):
     return StreamingResponse(generator)
 
 
-@app.post("/worker_generate_nostream", response_class=ORJSONResponse)
+@app.post("/worker_generate_nostream")
 async def worker_api_generate_nostream(request: Request):
     params = await request.json()
     output = controller.worker_api_generate_nostream(params)
-    return ORJSONResponse(output)
+    return output
 
 
 @app.post("/worker_get_status")
