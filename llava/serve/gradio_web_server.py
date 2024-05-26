@@ -346,7 +346,7 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
     # No available worker
     if worker_addr == "":
         state.messages[-1][-1] = server_error_msg
-        yield (state, state.to_gradio_chatbot(), disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
+        yield (state, state.to_gradio_chatbot(), json.dumps([]), disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
         return
 
     # Construct prompt
@@ -376,7 +376,7 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
     pload['images'] = state.get_images()
 
     state.messages[-1][-1] = "▌"
-    yield (state, state.to_gradio_chatbot()) + (disable_btn,) * 5
+    yield (state, state.to_gradio_chatbot(), json.dumps([])) + (disable_btn,) * 5
 
     try:
         response = requests.post(worker_addr + "/worker_generate_nostream",
@@ -388,19 +388,19 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
         if data["error_code"] == 0:
             output = data["text"][len(prompt):].strip()
             state.messages[-1][-1] = output + "▌"
-            yield (state, state.to_gradio_chatbot()) + (disable_btn,) * 5
+            yield (state, state.to_gradio_chatbot(), data['log_probs']) + (disable_btn,) * 5
         else:
             output = data["text"] + f" (error_code: {data['error_code']})"
             state.messages[-1][-1] = output
-            yield (state, state.to_gradio_chatbot()) + (disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
+            yield (state, state.to_gradio_chatbot(), json.dumps([])) + (disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
             return
     except requests.exceptions.RequestException as e:
         state.messages[-1][-1] = server_error_msg
-        yield (state, state.to_gradio_chatbot()) + (disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
+        yield (state, state.to_gradio_chatbot(), json.dumps([])) + (disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
         return
 
     state.messages[-1][-1] = state.messages[-1][-1][:-1]
-    yield (state, state.to_gradio_chatbot()) + (enable_btn,) * 5
+    yield (state, state.to_gradio_chatbot(), json.dumps([])) + (enable_btn,) * 5
 
     finish_tstamp = time.time()
     logger.info(f"{output}")
@@ -566,6 +566,8 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
             concurrency_limit=concurrency_count
         )
 
+        logprobs_json = gr.JSON()
+
         fake_submit_btn.click(
             add_text,
             [state, textbox, imagebox, image_process_mode],
@@ -573,7 +575,7 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
         ).then(
             http_bot_nostream,
             [state, model_selector, temperature, top_p, max_output_tokens],
-            [state, chatbot] + btn_list,
+            [state, chatbot, logprobs_json] + btn_list,
             concurrency_limit=concurrency_count
         )
 
