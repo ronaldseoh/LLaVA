@@ -231,6 +231,111 @@ class ModelWorker:
             }
             yield json.dumps(ret).encode() + b"\0"
 
+    @torch.inference_mode()
+    def generate_nostream(self, params):
+        tokenizer, model, image_processor = self.tokenizer, self.model, self.image_processor
+
+        prompt = params["prompt"]
+        ori_prompt = prompt
+        images = params.get("images", None)
+        num_image_tokens = 0
+        if images is not None and len(images) > 0 and self.is_multimodal:
+            if len(images) > 0:
+                if len(images) != prompt.count(DEFAULT_IMAGE_TOKEN):
+                    raise ValueError("Number of images does not match number of <image> tokens in prompt")
+
+                images = [load_image_from_base64(image) for image in images]
+                image_sizes = [image.size for image in images]
+                images = process_images(images, image_processor, model.config)
+
+                if type(images) is list:
+                    images = [image.to(self.model.device, dtype=torch.float16) for image in images]
+                else:
+                    images = images.to(self.model.device, dtype=torch.float16)
+
+                replace_token = DEFAULT_IMAGE_TOKEN
+                if getattr(self.model.config, 'mm_use_im_start_end', False):
+                    replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+                prompt = prompt.replace(DEFAULT_IMAGE_TOKEN, replace_token)
+
+                num_image_tokens = prompt.count(replace_token) * model.get_vision_tower().num_patches
+            else:
+                images = None
+                image_sizes = None
+            image_args = {"images": images, "image_sizes": image_sizes}
+        else:
+            images = None
+            image_args = {}
+
+        temperature = float(params.get("temperature", 1.0))
+        top_p = float(params.get("top_p", 1.0))
+        max_context_length = getattr(model.config, 'max_position_embeddings', 2048)
+        max_new_tokens = min(int(params.get("max_new_tokens", 256)), 1024)
+        stop_str = params.get("stop", None)
+        do_sample = True if temperature > 0.001 else False
+
+        input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(self.device)
+        keywords = [stop_str]
+        # stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
+        streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=15)
+        generation_output_store = {}
+
+        def model_generate_store_output(generate_kwargs, output_store):
+            output_store.update(model.generate(**generate_kwargs))
+
+        max_new_tokens = min(max_new_tokens, max_context_length - input_ids.shape[-1] - num_image_tokens)
+
+        if max_new_tokens < 1:
+            yield json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "error_code": 0}).encode() + b"\0"
+            return
+
+        generate_kwargs=dict(
+            inputs=input_ids,
+            do_sample=do_sample,
+            temperature=temperature,
+            top_p=top_p,
+            max_new_tokens=max_new_tokens,
+            streamer=streamer,
+            use_cache=True,
+            return_dict_in_generate=True,
+            output_scores=True,
+            **image_args)
+
+        thread = Thread(target=model_generate_store_output, args=(generate_kwargs, generation_output_store,))
+        thread.start()
+
+        generated_text = ori_prompt
+
+        for new_text in streamer:
+            generated_text += new_text
+            if generated_text.endswith(stop_str):
+                generated_text = generated_text[:-len(stop_str)]
+            yield json.dumps({"text": generated_text, "error_code": 0}).encode() + b"\0"
+
+    def generate_nostream_gate(self, params):
+        try:
+            yield self.generate_nostream(params)
+        except ValueError as e:
+            print("Caught ValueError:", e)
+            ret = {
+                "text": server_error_msg,
+                "error_code": 1,
+            }
+            yield json.dumps(ret).encode() + b"\0"
+        except torch.cuda.CudaError as e:
+            print("Caught torch.cuda.CudaError:", e)
+            ret = {
+                "text": server_error_msg,
+                "error_code": 1,
+            }
+            yield json.dumps(ret).encode() + b"\0"
+        except Exception as e:
+            print("Caught Unknown Error", e)
+            ret = {
+                "text": server_error_msg,
+                "error_code": 1,
+            }
+            yield json.dumps(ret).encode() + b"\0"
 
 app = FastAPI()
 
@@ -255,6 +360,24 @@ async def generate_stream(request: Request):
     background_tasks = BackgroundTasks()
     background_tasks.add_task(partial(release_model_semaphore, fn=worker.send_heart_beat))
     return StreamingResponse(generator, background=background_tasks)
+
+
+@app.post("/worker_generate_nostream")
+async def generate_nostream(request: Request):
+    global model_semaphore, global_counter
+    global_counter += 1
+    params = await request.json()
+
+    if model_semaphore is None:
+        model_semaphore = asyncio.Semaphore(args.limit_model_concurrency)
+    await model_semaphore.acquire()
+    worker.send_heart_beat()
+    output = worker.generate_nostream_gate(params)
+
+    background_tasks = BackgroundTasks()
+    background_tasks.add_task(partial(release_model_semaphore, fn=worker.send_heart_beat))
+
+    return output
 
 
 @app.post("/worker_get_status")
