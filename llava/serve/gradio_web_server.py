@@ -384,10 +384,9 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
 
         data = json.loads(response.text)
 
-        logger.warning("response text: " + str(response.text))
+        logging.warning("dtype: " + str(type(data)))
 
-        logger.warning("response: " + str(data))
-        
+        data = json.loads(data)
 
         if data["error_code"] == 0:
             output = data["text"][len(prompt):].strip()
