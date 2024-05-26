@@ -273,7 +273,7 @@ class ModelWorker:
         max_new_tokens = min(max_new_tokens, max_context_length - input_ids.shape[-1] - num_image_tokens)
 
         if max_new_tokens < 1:
-            return json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "error_code": 0}).encode()
+            return json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "log_probs": json.dumps([]), "error_code": 0}).encode()
 
         generation_output = model.generate(
             inputs=input_ids,
@@ -286,11 +286,18 @@ class ModelWorker:
             output_scores=True,
             **image_args)
 
+        logprobs = []
+
+        for i, tid in enumerate(generation_output['sequences'][0]):
+            if tid not in tokenizer.all_special_ids:
+                # i-1 because we are skipping the '<s>' token in the beginning
+                logprobs.append(generation_output['scores'][i-1].max().cpu().numpy().item())
+
         generated_text = ori_prompt
 
         generated_text += tokenizer.decode(generation_output['sequences'][0], skip_special_tokens=True).strip()
 
-        return json.dumps({"text": generated_text, "error_code": 0}).encode()
+        return json.dumps({"text": generated_text, "log_probs": json.dumps(logprobs), "error_code": 0}).encode()
 
     def generate_nostream_gate(self, params):
         try:
@@ -299,6 +306,7 @@ class ModelWorker:
             print("Caught ValueError:", e)
             ret = {
                 "text": server_error_msg,
+                "log_probs": json.dumps([]),
                 "error_code": 1,
             }
             return json.dumps(ret).encode()
@@ -306,6 +314,7 @@ class ModelWorker:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
                 "text": server_error_msg,
+                "log_probs": json.dumps([]),
                 "error_code": 1,
             }
             return json.dumps(ret).encode()
@@ -313,6 +322,7 @@ class ModelWorker:
             print("Caught Unknown Error", e)
             ret = {
                 "text": server_error_msg,
+                "log_probs": json.dumps([]),
                 "error_code": 1,
             }
             return json.dumps(ret).encode()
