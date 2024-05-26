@@ -493,6 +493,7 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
                         textbox.render()
                     with gr.Column(scale=1, min_width=50):
                         submit_btn = gr.Button(value="Send", variant="primary")
+                        fake_submit_btn = gr.Button(value="Fake Send", variant="primary")
                 with gr.Row(elem_id="buttons") as button_row:
                     upvote_btn = gr.Button(value="👍  Upvote", interactive=False)
                     downvote_btn = gr.Button(value="👎  Downvote", interactive=False)
@@ -560,6 +561,17 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
             [state, chatbot, textbox, imagebox] + btn_list
         ).then(
             http_bot,
+            [state, model_selector, temperature, top_p, max_output_tokens],
+            [state, chatbot] + btn_list,
+            concurrency_limit=concurrency_count
+        )
+
+        fake_submit_btn.click(
+            add_text,
+            [state, textbox, imagebox, image_process_mode],
+            [state, chatbot, textbox, imagebox] + btn_list
+        ).then(
+            http_bot_nostream,
             [state, model_selector, temperature, top_p, max_output_tokens],
             [state, chatbot] + btn_list,
             concurrency_limit=concurrency_count
