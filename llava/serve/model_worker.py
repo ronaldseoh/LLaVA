@@ -9,7 +9,7 @@ import threading
 import uuid
 
 from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, ORJSONResponse
 import requests
 import torch
 import uvicorn
@@ -302,11 +302,11 @@ class ModelWorker:
 
         generated_text += tokenizer.decode(generation_output['sequences'][0], skip_special_tokens=True).strip()
 
-        return json.dumps({"text": generated_text, "log_probs": json.dumps(logprobs), "error_code": 0}).encode()
+        return {"text": generated_text, "log_probs": json.dumps(logprobs), "error_code": 0}
 
     def generate_nostream_gate(self, params):
         try:
-            return self.generate_nostream(params)
+            return ORJSONResponse(self.generate_nostream(params))
         except ValueError as e:
             print("Caught ValueError:", e)
             ret = {
@@ -314,7 +314,7 @@ class ModelWorker:
                 "log_probs": json.dumps([]),
                 "error_code": 1,
             }
-            return json.dumps(ret).encode()
+            return ORJSONResponse(ret)
         except torch.cuda.CudaError as e:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
@@ -322,7 +322,7 @@ class ModelWorker:
                 "log_probs": json.dumps([]),
                 "error_code": 1,
             }
-            return json.dumps(ret).encode()
+            return ORJSONResponse(ret)
         except Exception as e:
             print("Caught Unknown Error", e)
             ret = {
@@ -330,7 +330,7 @@ class ModelWorker:
                 "log_probs": json.dumps([]),
                 "error_code": 1,
             }
-            return json.dumps(ret).encode()
+            return ORJSONResponse(ret)
 
 app = FastAPI()
 
