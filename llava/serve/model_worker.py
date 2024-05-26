@@ -293,8 +293,8 @@ class ModelWorker:
                 logprob_dict = {}
 
                 # i-1 because we are skipping the '<s>' token in the beginning
-                for input_id, score in enumerate(generation_output['scores'][i-1].flatten().cpu().numpy().tolist()):
-                    logprob_dict[tokenizer.convert_ids_to_tokens(input_id)] = score
+                for input_id, score in enumerate(generation_output['scores'][i-1].flatten().cpu().numpy()):
+                    logprob_dict[tokenizer.convert_ids_to_tokens(input_id)] = str(score)
 
                 logprobs.append(logprob_dict)
 
