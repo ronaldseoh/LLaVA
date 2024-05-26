@@ -288,10 +288,7 @@ class ModelWorker:
 
         generated_text = ori_prompt
 
-        generated_text += tokenizer.decode(generation_output['sequences'][0]).strip()
-
-        if generated_text.endswith(stop_str):
-            generated_text = generated_text[:-len(stop_str)]
+        generated_text += tokenizer.decode(generation_output['sequences'][0], skip_special_tokens=True).strip()
 
         return json.dumps({"text": generated_text, "error_code": 0}).encode()
 
