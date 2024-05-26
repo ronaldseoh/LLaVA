@@ -273,7 +273,7 @@ class ModelWorker:
         max_new_tokens = min(max_new_tokens, max_context_length - input_ids.shape[-1] - num_image_tokens)
 
         if max_new_tokens < 1:
-            return json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "error_code": 0}).encode() + b"\0"
+            return json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "error_code": 0}).encode()
 
         generation_output = model.generate(
             inputs=input_ids,
@@ -293,7 +293,7 @@ class ModelWorker:
         if generated_text.endswith(stop_str):
             generated_text = generated_text[:-len(stop_str)]
 
-        return json.dumps({"text": generated_text, "error_code": 0}).encode() + b"\0"
+        return json.dumps({"text": generated_text, "error_code": 0}).encode()
 
     def generate_nostream_gate(self, params):
         try:
@@ -304,21 +304,21 @@ class ModelWorker:
                 "text": server_error_msg,
                 "error_code": 1,
             }
-            return json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode()
         except torch.cuda.CudaError as e:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
                 "text": server_error_msg,
                 "error_code": 1,
             }
-            return json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode()
         except Exception as e:
             print("Caught Unknown Error", e)
             ret = {
                 "text": server_error_msg,
                 "error_code": 1,
             }
-            return json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode()
 
 app = FastAPI()
 

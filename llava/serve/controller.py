@@ -223,20 +223,20 @@ class Controller:
                 "text": server_error_msg,
                 "error_code": 2,
             }
-            return json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode()
 
         try:
             response = requests.post(worker_addr + "/worker_generate_nostream",
                 json=params, stream=False, timeout=200)
 
-            return response.content.encode() + b"\0"
+            return response.content
         except requests.exceptions.RequestException as e:
             logger.info(f"worker timeout: {worker_addr}")
             ret = {
                 "text": server_error_msg,
                 "error_code": 3,
             }
-            return json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode()
 
     # Let the controller act as a worker to achieve hierarchical
     # management. This can be used to connect isolated sub networks.
