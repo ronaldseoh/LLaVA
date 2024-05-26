@@ -285,6 +285,140 @@ def http_bot(state, model_selector, temperature, top_p, max_new_tokens, request:
         }
         fout.write(json.dumps(data) + "\n")
 
+def http_bot_non_stream(state, model_selector, temperature, top_p, max_new_tokens, request: gr.Request):
+    logger.info(f"http_bot. ip: {request.client.host}")
+    start_tstamp = time.time()
+    model_name = model_selector
+
+    if state.skip_next:
+        # This generate call is skipped due to invalid inputs
+        yield (state, state.to_gradio_chatbot()) + (no_change_btn,) * 5
+        return
+
+    if len(state.messages) == state.offset + 2:
+        # First round of conversation
+        if "llava" in model_name.lower():
+            if 'llama-2' in model_name.lower():
+                template_name = "llava_llama_2"
+            elif "mistral" in model_name.lower() or "mixtral" in model_name.lower():
+                if 'orca' in model_name.lower():
+                    template_name = "mistral_orca"
+                elif 'hermes' in model_name.lower():
+                    template_name = "chatml_direct"
+                else:
+                    template_name = "mistral_instruct"
+            elif 'llava-v1.6-34b' in model_name.lower():
+                template_name = "chatml_direct"
+            elif "v1" in model_name.lower():
+                if 'mmtag' in model_name.lower():
+                    template_name = "v1_mmtag"
+                elif 'plain' in model_name.lower() and 'finetune' not in model_name.lower():
+                    template_name = "v1_mmtag"
+                else:
+                    template_name = "llava_v1"
+            elif "mpt" in model_name.lower():
+                template_name = "mpt"
+            else:
+                if 'mmtag' in model_name.lower():
+                    template_name = "v0_mmtag"
+                elif 'plain' in model_name.lower() and 'finetune' not in model_name.lower():
+                    template_name = "v0_mmtag"
+                else:
+                    template_name = "llava_v0"
+        elif "mpt" in model_name:
+            template_name = "mpt_text"
+        elif "llama-2" in model_name:
+            template_name = "llama_2"
+        else:
+            template_name = "vicuna_v1"
+        new_state = conv_templates[template_name].copy()
+        new_state.append_message(new_state.roles[0], state.messages[-2][1])
+        new_state.append_message(new_state.roles[1], None)
+        state = new_state
+
+    # Query worker address
+    controller_url = args.controller_url
+    ret = requests.post(controller_url + "/get_worker_address",
+            json={"model": model_name})
+    worker_addr = ret.json()["address"]
+    logger.info(f"model_name: {model_name}, worker_addr: {worker_addr}")
+
+    # No available worker
+    if worker_addr == "":
+        state.messages[-1][-1] = server_error_msg
+        yield (state, state.to_gradio_chatbot(), disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
+        return
+
+    # Construct prompt
+    prompt = state.get_prompt()
+
+    all_images = state.get_images(return_pil=True)
+    all_image_hash = [hashlib.md5(image.tobytes()).hexdigest() for image in all_images]
+    for image, hash in zip(all_images, all_image_hash):
+        t = datetime.datetime.now()
+        filename = os.path.join(LOGDIR, "serve_images", f"{t.year}-{t.month:02d}-{t.day:02d}", f"{hash}.jpg")
+        if not os.path.isfile(filename):
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            image.save(filename)
+
+    # Make requests
+    pload = {
+        "model": model_name,
+        "prompt": prompt,
+        "temperature": float(temperature),
+        "top_p": float(top_p),
+        "max_new_tokens": min(int(max_new_tokens), 1536),
+        "stop": state.sep if state.sep_style in [SeparatorStyle.SINGLE, SeparatorStyle.MPT] else state.sep2,
+        "images": f'List of {len(state.get_images())} images: {all_image_hash}',
+    }
+    logger.info(f"==== request ====\n{pload}")
+
+    pload['images'] = state.get_images()
+
+    state.messages[-1][-1] = "▌"
+    yield (state, state.to_gradio_chatbot()) + (disable_btn,) * 5
+
+    try:
+        # Stream output
+        response = requests.post(worker_addr + "/worker_generate_stream",
+            headers=headers, json=pload, stream=True, timeout=10)
+        for chunk in response.iter_lines(decode_unicode=False, delimiter=b"\0"):
+            if chunk:
+                data = json.loads(chunk.decode())
+                if data["error_code"] == 0:
+                    output = data["text"][len(prompt):].strip()
+                    state.messages[-1][-1] = output + "▌"
+                    yield (state, state.to_gradio_chatbot()) + (disable_btn,) * 5
+                else:
+                    output = data["text"] + f" (error_code: {data['error_code']})"
+                    state.messages[-1][-1] = output
+                    yield (state, state.to_gradio_chatbot()) + (disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
+                    return
+                time.sleep(0.03)
+    except requests.exceptions.RequestException as e:
+        state.messages[-1][-1] = server_error_msg
+        yield (state, state.to_gradio_chatbot()) + (disable_btn, disable_btn, disable_btn, enable_btn, enable_btn)
+        return
+
+    state.messages[-1][-1] = state.messages[-1][-1][:-1]
+    yield (state, state.to_gradio_chatbot()) + (enable_btn,) * 5
+
+    finish_tstamp = time.time()
+    logger.info(f"{output}")
+
+    with open(get_conv_log_filename(), "a") as fout:
+        data = {
+            "tstamp": round(finish_tstamp, 4),
+            "type": "chat",
+            "model": model_name,
+            "start": round(start_tstamp, 4),
+            "finish": round(finish_tstamp, 4),
+            "state": state.dict(),
+            "images": all_image_hash,
+            "ip": request.client.host,
+        }
+        fout.write(json.dumps(data) + "\n")
+
 title_markdown = ("""
 # 🌋 LLaVA: Large Language and Vision Assistant
 [[Project Page](https://llava-vl.github.io)] [[Code](https://github.com/haotian-liu/LLaVA)] [[Model](https://github.com/haotian-liu/LLaVA/blob/main/docs/MODEL_ZOO.md)] | 📚 [[LLaVA](https://arxiv.org/abs/2304.08485)] [[LLaVA-v1.5](https://arxiv.org/abs/2310.03744)] [[LLaVA-v1.6](https://llava-vl.github.io/blog/2024-01-30-llava-1-6/)]
