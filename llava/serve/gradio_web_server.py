@@ -566,7 +566,7 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
             concurrency_limit=concurrency_count
         )
 
-        logprobs = gr.Textbox(show_label=False)
+        logprobs_json = gr.JSON()
 
         fake_submit_btn.click(
             add_text,
@@ -575,7 +575,7 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
         ).then(
             http_bot_nostream,
             [state, model_selector, temperature, top_p, max_output_tokens],
-            [state, chatbot, logprobs] + btn_list,
+            [state, chatbot, logprobs_json] + btn_list,
             concurrency_limit=concurrency_count
         )
 
