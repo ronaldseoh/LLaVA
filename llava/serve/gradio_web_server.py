@@ -285,7 +285,7 @@ def http_bot(state, model_selector, temperature, top_p, max_new_tokens, request:
         }
         fout.write(json.dumps(data) + "\n")
 
-def http_bot_non_stream(state, model_selector, temperature, top_p, max_new_tokens, request: gr.Request):
+def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens, request: gr.Request):
     logger.info(f"http_bot. ip: {request.client.host}")
     start_tstamp = time.time()
     model_name = model_selector
@@ -380,8 +380,8 @@ def http_bot_non_stream(state, model_selector, temperature, top_p, max_new_token
 
     try:
         # Stream output
-        response = requests.post(worker_addr + "/worker_generate_stream",
-            headers=headers, json=pload, stream=True, timeout=10)
+        response = requests.post(worker_addr + "/worker_generate_nostream",
+            headers=headers, json=pload, stream=False, timeout=10)
         for chunk in response.iter_lines(decode_unicode=False, delimiter=b"\0"):
             if chunk:
                 data = json.loads(chunk.decode())

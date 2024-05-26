@@ -269,11 +269,6 @@ class ModelWorker:
         input_ids = tokenizer_image_token(prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).to(self.device)
         keywords = [stop_str]
         # stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
-        streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=15)
-        generation_output_store = {}
-
-        def model_generate_store_output(generate_kwargs, output_store):
-            output_store.update(model.generate(**generate_kwargs))
 
         max_new_tokens = min(max_new_tokens, max_context_length - input_ids.shape[-1] - num_image_tokens)
 
@@ -281,53 +276,50 @@ class ModelWorker:
             yield json.dumps({"text": ori_prompt + "Exceeds max token length. Please start a new conversation, thanks.", "error_code": 0}).encode() + b"\0"
             return
 
-        generate_kwargs=dict(
+        generation_output = model.generate(
             inputs=input_ids,
             do_sample=do_sample,
             temperature=temperature,
             top_p=top_p,
             max_new_tokens=max_new_tokens,
-            streamer=streamer,
             use_cache=True,
             return_dict_in_generate=True,
             output_scores=True,
             **image_args)
 
-        thread = Thread(target=model_generate_store_output, args=(generate_kwargs, generation_output_store,))
-        thread.start()
-
         generated_text = ori_prompt
 
-        for new_text in streamer:
-            generated_text += new_text
-            if generated_text.endswith(stop_str):
-                generated_text = generated_text[:-len(stop_str)]
-            yield json.dumps({"text": generated_text, "error_code": 0}).encode() + b"\0"
+        generated_text += tokenizer.decode(generation_output['sequences'][0]).strip()
+
+        if generated_text.endswith(stop_str):
+            generated_text = generated_text[:-len(stop_str)]
+
+        return json.dumps({"text": generated_text, "error_code": 0}).encode() + b"\0"
 
     def generate_nostream_gate(self, params):
         try:
-            yield self.generate_nostream(params)
+            return self.generate_nostream(params)
         except ValueError as e:
             print("Caught ValueError:", e)
             ret = {
                 "text": server_error_msg,
                 "error_code": 1,
             }
-            yield json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode() + b"\0"
         except torch.cuda.CudaError as e:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
                 "text": server_error_msg,
                 "error_code": 1,
             }
-            yield json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode() + b"\0"
         except Exception as e:
             print("Caught Unknown Error", e)
             ret = {
                 "text": server_error_msg,
                 "error_code": 1,
             }
-            yield json.dumps(ret).encode() + b"\0"
+            return json.dumps(ret).encode() + b"\0"
 
 app = FastAPI()
 
