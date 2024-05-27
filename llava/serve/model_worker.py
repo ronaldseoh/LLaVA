@@ -9,7 +9,7 @@ import threading
 import uuid
 
 from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, ORJSONResponse
 import requests
 import torch
 import uvicorn
@@ -302,7 +302,7 @@ class ModelWorker:
 
         generated_text += tokenizer.decode(generation_output['sequences'][0], skip_special_tokens=True).strip()
 
-        return json.dumps({"text": generated_text, "log_probs": json.dumps(logprobs), "error_code": 0}).encode()
+        return {"text": generated_text, "log_probs": json.dumps(logprobs), "error_code": 0}
 
     def generate_nostream_gate(self, params):
         try:
@@ -314,7 +314,7 @@ class ModelWorker:
                 "log_probs": json.dumps([]),
                 "error_code": 1,
             }
-            return json.dumps(ret).encode()
+            return ret
         except torch.cuda.CudaError as e:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
@@ -322,7 +322,7 @@ class ModelWorker:
                 "log_probs": json.dumps([]),
                 "error_code": 1,
             }
-            return json.dumps(ret).encode()
+            return ret
         except Exception as e:
             print("Caught Unknown Error", e)
             ret = {
@@ -330,7 +330,7 @@ class ModelWorker:
                 "log_probs": json.dumps([]),
                 "error_code": 1,
             }
-            return json.dumps(ret).encode()
+            return ret
 
 app = FastAPI()
 
@@ -357,7 +357,7 @@ async def generate_stream(request: Request):
     return StreamingResponse(generator, background=background_tasks)
 
 
-@app.post("/worker_generate_nostream")
+@app.post("/worker_generate_nostream", response_class=ORJSONResponse)
 async def generate_nostream(request: Request):
     global model_semaphore, global_counter
     global_counter += 1
@@ -372,7 +372,7 @@ async def generate_nostream(request: Request):
     background_tasks = BackgroundTasks()
     background_tasks.add_task(partial(release_model_semaphore, fn=worker.send_heart_beat))
 
-    return output
+    return ORJSONResponse(output)
 
 
 @app.post("/worker_get_status")
