@@ -387,7 +387,7 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
         if data["error_code"] == 0:
             output = data["text"][len(prompt):].strip()
             state.messages[-1][-1] = output + "▌"
-            yield (state, state.to_gradio_chatbot(), data['log_probs']) + (disable_btn,) * 5
+            yield (state, state.to_gradio_chatbot(), json.loads(data['log_probs'])) + (disable_btn,) * 5
         else:
             output = data["text"] + f" (error_code: {data['error_code']})"
             state.messages[-1][-1] = output
@@ -399,7 +399,7 @@ def http_bot_nostream(state, model_selector, temperature, top_p, max_new_tokens,
         return
 
     state.messages[-1][-1] = state.messages[-1][-1][:-1]
-    yield (state, state.to_gradio_chatbot(), data['log_probs']) + (enable_btn,) * 5
+    yield (state, state.to_gradio_chatbot(), json.loads(data['log_probs'])) + (enable_btn,) * 5
 
     finish_tstamp = time.time()
     logger.info(f"{output}")
