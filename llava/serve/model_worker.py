@@ -293,8 +293,8 @@ class ModelWorker:
                 logprob_dict = {}
 
                 # i-1 because we are skipping the '<s>' token in the beginning
-                for input_id, score in enumerate(generation_output['scores'][i-1].flatten().cpu().numpy().tolist()):
-                    logprob_dict[tokenizer.convert_ids_to_tokens(input_id)] = score
+                for input_id, score in enumerate(generation_output['scores'][i-1].flatten().cpu().numpy()):
+                    logprob_dict[tokenizer.convert_ids_to_tokens(input_id)] = str(score)
 
                 logprobs.append(logprob_dict)
 
@@ -302,7 +302,7 @@ class ModelWorker:
 
         generated_text += tokenizer.decode(generation_output['sequences'][0], skip_special_tokens=True).strip()
 
-        return {"text": generated_text, "log_probs": logprobs, "error_code": 0}
+        return {"text": generated_text, "log_probs": json.dumps(logprobs), "error_code": 0}
 
     def generate_nostream_gate(self, params):
         try:
@@ -311,7 +311,7 @@ class ModelWorker:
             print("Caught ValueError:", e)
             ret = {
                 "text": server_error_msg,
-                "log_probs": [],
+                "log_probs": json.dumps([]),
                 "error_code": 1,
             }
             return ORJSONResponse(ret)
@@ -319,7 +319,7 @@ class ModelWorker:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
                 "text": server_error_msg,
-                "log_probs": [],
+                "log_probs": json.dumps([]),
                 "error_code": 1,
             }
             return ORJSONResponse(ret)
@@ -327,7 +327,7 @@ class ModelWorker:
             print("Caught Unknown Error", e)
             ret = {
                 "text": server_error_msg,
-                "log_probs": [],
+                "log_probs": json.dumps([]),
                 "error_code": 1,
             }
             return ORJSONResponse(ret)
