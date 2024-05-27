@@ -306,7 +306,7 @@ class ModelWorker:
 
     def generate_nostream_gate(self, params):
         try:
-            return self.generate_nostream(params)
+            return ORJSONResponse(self.generate_nostream(params))
         except ValueError as e:
             print("Caught ValueError:", e)
             ret = {
@@ -314,7 +314,7 @@ class ModelWorker:
                 "log_probs": [],
                 "error_code": 1,
             }
-            return ret
+            return ORJSONResponse(ret)
         except torch.cuda.CudaError as e:
             print("Caught torch.cuda.CudaError:", e)
             ret = {
@@ -322,7 +322,7 @@ class ModelWorker:
                 "log_probs": [],
                 "error_code": 1,
             }
-            return ret
+            return ORJSONResponse(ret)
         except Exception as e:
             print("Caught Unknown Error", e)
             ret = {
@@ -330,7 +330,7 @@ class ModelWorker:
                 "log_probs": [],
                 "error_code": 1,
             }
-            return ret
+            return ORJSONResponse(ret)
 
 app = FastAPI()
 
@@ -372,7 +372,7 @@ async def generate_nostream(request: Request):
     background_tasks = BackgroundTasks()
     background_tasks.add_task(partial(release_model_semaphore, fn=worker.send_heart_beat))
 
-    return ORJSONResponse(output)
+    return output
 
 
 @app.post("/worker_get_status")
