@@ -291,7 +291,7 @@ class ModelWorker:
         for i, tid in enumerate(generation_output['sequences'][0]):
             if tid not in tokenizer.all_special_ids:
                 # i-1 because we are skipping the '<s>' token in the beginning
-                logprobs.append(generation_output['scores'][i-1].flatten().cpu().numpy().tolist())
+                logprobs.append(torch.nn.functional.log_softmax(generation_output['scores'][i-1]).flatten().cpu().numpy().tolist())
 
         generated_text = ori_prompt
 
