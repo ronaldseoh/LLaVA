@@ -128,13 +128,11 @@ def clear_history(request: gr.Request):
 def remove_last_conversation(state, request: gr.Request):
     logger.info(f"remove_last_conversation. ip: {request.client.host}")
 
-    # state is actually in a fresh state, just return as-is
-    if len(state.messages) == state.offset + 2:
-        return (state, state.to_gradio_chatbot(), "", None) + (disable_btn,) * 5
-    else:
+    if len(state.messages) > state.offset + 2:
         del state.messages[-1]
         del state.messages[-1]
 
+    return (state, state.to_gradio_chatbot(), "", None) + (disable_btn,) * 5
 
 def add_text(state, text, image, image_process_mode, request: gr.Request):
     logger.info(f"add_text. ip: {request.client.host}. len: {len(text)}")
