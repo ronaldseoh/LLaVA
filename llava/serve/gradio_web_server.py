@@ -128,7 +128,7 @@ def clear_history(request: gr.Request):
 def remove_last_conversation(state, request: gr.Request):
     logger.info(f"remove_last_conversation. ip: {request.client.host}")
 
-    if len(state.messages) > state.offset + 2:
+    if len(state.messages) % 2 == 0 and len(state.messages) > 2:
         del state.messages[-1]
         del state.messages[-1]
 
