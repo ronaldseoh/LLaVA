@@ -512,6 +512,7 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
                     #stop_btn = gr.Button(value="⏹️  Stop Generation", interactive=False)
                     regenerate_btn = gr.Button(value="🔄  Regenerate", interactive=False)
                     clear_btn = gr.Button(value="🗑️  Clear", interactive=False)
+                    remove_last_btn = gr.Button(value="Remove last", interactive=False)
 
         if not embed_mode:
             gr.Markdown(tos_markdown)
@@ -550,6 +551,13 @@ def build_demo(embed_mode, cur_dir=None, concurrency_count=10):
         clear_btn.click(
             clear_history,
             None,
+            [state, chatbot, textbox, imagebox] + btn_list,
+            queue=False
+        )
+        
+        remove_last_btn.click(
+            remove_last_conversation,
+            [state],
             [state, chatbot, textbox, imagebox] + btn_list,
             queue=False
         )
