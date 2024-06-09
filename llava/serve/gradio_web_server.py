@@ -131,7 +131,8 @@ def remove_last_conversation(state, request: gr.Request):
     if len(state.messages) > state.offset + 2:
         del state.messages[-1]
         del state.messages[-1]
-        logger.info(str(state))
+
+    logger.info(str(state))
     return (state, state.to_gradio_chatbot(), "", None) + (disable_btn,) * 5
 
 def add_text(state, text, image, image_process_mode, request: gr.Request):
